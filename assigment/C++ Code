@@ -1,0 +1,530 @@
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <vector>
+#include <memory>
+#include <limits>
+using namespace std;
+
+class Person {
+protected:
+    int id;
+    string name, phone, email;
+
+public:
+    Person() : id(0), name(""), phone(""), email("") {}
+    Person(int i, const string& n, const string& p, const string& e)
+        : id(i), name(n), phone(p), email(e) {}
+    Person(const Person& other)
+        : id(other.id), name(other.name), phone(other.phone), email(other.email) {}
+    virtual ~Person() = default;
+
+    int getId() const { return id; }
+    string getName() const { return name; }
+
+    virtual void display() const {
+        cout << "ID: " << id << " | Name: " << name
+             << " | Phone: " << phone << " | Email: " << email << '\n';
+    }
+};
+
+class Guest : public virtual Person {
+public:
+    Guest() : Person() {}
+    Guest(int i, const string& n, const string& p, const string& e)
+        : Person(i, n, p, e) {}
+
+    void display() const override {
+        cout << "Guest - ";
+        Person::display();
+    }
+};
+
+class LoyaltyMember : public virtual Person {
+protected:
+    int loyaltyPoints;
+
+public:
+    LoyaltyMember() : Person(), loyaltyPoints(0) {}
+    explicit LoyaltyMember(int points) : Person(), loyaltyPoints(points) {}
+
+    void addPoints(int p) { loyaltyPoints += p; }
+    int getPoints() const { return loyaltyPoints; }
+};
+
+class VIPGuest : public Guest, public LoyaltyMember {
+public:
+    VIPGuest() : Person(), Guest(), LoyaltyMember() {}
+
+    VIPGuest(int i, const string& n, const string& p,
+             const string& e, int points)
+        : Person(i, n, p, e), Guest(i, n, p, e), LoyaltyMember(points) {}
+
+    void display() const override {
+        cout << "VIP Guest - ";
+        Person::display();
+ 
+        cout << "Loyalty Points: " << loyaltyPoints << '\n';
+    }
+};
+
+class Room {
+protected:
+    int roomNumber;
+    bool available;
+
+public:
+    Room(int number = 0) : roomNumber(number), available(true) {}
+    Room(const Room& r)
+        : roomNumber(r.roomNumber), available(r.available) {}
+    virtual ~Room() {}
+
+    int getRoomNumber() const { return roomNumber; }
+    bool isAvailable() const { return available; }
+    void setAvailable(bool a) { available = a; }
+
+    virtual string getType() const = 0;
+    virtual double getRate() const = 0;
+    virtual void display() const = 0;
+};
+
+class StandardRoom : public Room {
+public:
+    StandardRoom(int n = 0) : Room(n) {}
+    string getType() const override { return "Standard"; }
+    double getRate() const override { return 2500.0; }
+
+    void display() const override {
+        cout << roomNumber << " | Standard | Rs."
+             << fixed << setprecision(2) << getRate() << " | "
+             << (available ? "Available" : "Occupied") << '\n';
+    }
+};
+
+class DeluxeRoom : public Room {
+public:
+    DeluxeRoom(int n = 0) : Room(n) {}
+    string getType() const override { return "Deluxe"; }
+    double getRate() const override { return 4000.0; }
+
+    void display() const override {
+        cout << roomNumber << " | Deluxe | Rs."
+             << fixed << setprecision(2) << getRate() << " | "
+             << (available ? "Available" : "Occupied") << '\n';
+    }
+};
+
+class SuiteRoom : public Room {
+public:
+    SuiteRoom(int n = 0) : Room(n) {}
+    string getType() const override { return "Suite"; }
+    double getRate() const override { return 6500.0; }
+
+    void display() const override {
+        cout << roomNumber << " | Suite | Rs."
+             << fixed << setprecision(2) << getRate() << " | "
+             << (available ? "Available" : "Occupied") << '\n';
+    }
+};
+
+class HotelService {
+protected:
+ 
+    string name;
+    double price;
+
+public:
+    HotelService(const string& n = "", double p = 0)
+        : name(n), price(p) {}
+    virtual ~HotelService() {}
+
+    double getPrice() const { return price; }
+    string getName() const { return name; }
+
+    virtual void display() const = 0;
+};
+
+class FoodService : public HotelService {
+public:
+    FoodService(double p = 500) : HotelService("Food Service", p) {}
+
+    void display() const override {
+        cout << name << " - Rs."
+             << fixed << setprecision(2) << price << '\n';
+    }
+};
+
+class LaundryService : public HotelService {
+public:
+    LaundryService(double p = 300)
+        : HotelService("Laundry Service", p) {}
+
+    void display() const override {
+        cout << name << " - Rs."
+             << fixed << setprecision(2) << price << '\n';
+    }
+};
+
+class SpaService : public HotelService {
+public:
+    SpaService(double p = 1000)
+        : HotelService("Spa Service", p) {}
+
+    void display() const override {
+        cout << name << " - Rs."
+             << fixed << setprecision(2) << price << '\n';
+    }
+};
+
+class Reservation {
+    static int nextId;
+    static int totalReservations;
+
+    int reservationId;
+    Guest guest;
+    Room* room;
+    vector<unique_ptr<HotelService>> services;
+    int days;
+    bool active;
+
+public:
+    Reservation()
+        : reservationId(nextId++), guest(), room(nullptr),
+          days(0), active(false) {
+        ++totalReservations;
+    }
+
+    Reservation(const Guest& g, Room* r, int d)
+ 
+        : reservationId(nextId++), guest(g), room(r),
+          days(d), active(true) {
+        if (room)
+            room->setAvailable(false);
+        ++totalReservations;
+    }
+
+    Reservation(const Reservation& other)
+        : reservationId(nextId++), guest(other.guest),
+          room(other.room), days(other.days), active(other.active) {
+        for (const auto& s : other.services) {
+            if (s->getName() == "Food Service")
+                services.push_back(make_unique<FoodService>(s->getPrice()));
+            else if (s->getName() == "Laundry Service")
+                services.push_back(make_unique<LaundryService>(s->getPrice()));
+            else
+                services.push_back(make_unique<SpaService>(s->getPrice()));
+        }
+        ++totalReservations;
+    }
+
+    ~Reservation() {
+        if (room && active)
+            room->setAvailable(true);
+    }
+
+    int getId() const { return reservationId; }
+    bool isActive() const { return active; }
+
+    void addService(unique_ptr<HotelService> s) {
+        if (active)
+            services.push_back(move(s));
+    }
+
+    void cancel() {
+        if (active) {
+            active = false;
+            if (room)
+                room->setAvailable(true);
+        }
+    }
+
+    double calculateRoomCost() const {
+        return room ? room->getRate() * days : 0;
+    }
+
+    double calculateServiceCost() const {
+        double total = 0;
+        for (const auto& s : services)
+            total += s->getPrice();
+        return total;
+    }
+
+    double calculateBill() const {
+        return calculateRoomCost() + calculateServiceCost();
+    }
+
+    Reservation& operator+=(unique_ptr<HotelService> s) {
+        addService(move(s));
+        return *this;
+    }
+
+    bool operator<(const Reservation& other) const {
+        return calculateBill() < other.calculateBill();
+    }
+ 
+
+    void display() const {
+        cout << "Reservation ID: " << reservationId << '\n';
+        cout << "Guest: " << guest.getName()
+             << " (" << guest.getId() << ")\n";
+
+        if (room)
+            cout << "Room: " << room->getRoomNumber()
+                 << " - " << room->getType() << '\n';
+
+        cout << "Days: " << days << '\n';
+        cout << "Status: " << (active ? "Active" : "Cancelled") << '\n';
+        cout << "Room Cost: Rs." << fixed << setprecision(2)
+             << calculateRoomCost() << '\n';
+        cout << "Services: Rs." << calculateServiceCost() << '\n';
+        cout << "Total Bill: Rs." << calculateBill() << '\n';
+    }
+
+    static int getTotalReservations() {
+        return totalReservations;
+    }
+};
+
+int Reservation::nextId = 1001;
+int Reservation::totalReservations = 0;
+
+class HotelManagementSystem {
+    vector<Guest> guests;
+    vector<unique_ptr<Room>> rooms;
+    vector<unique_ptr<Reservation>> reservations;
+    int totalCancelled = 0;
+
+    int readInt(const string& prompt, int minValue, int maxValue) {
+        int x;
+        while (true) {
+            cout << prompt;
+            if (cin >> x && x >= minValue && x <= maxValue)
+                return x;
+
+            cout << "Invalid input. Try again.\n";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        }
+    }
+
+    string readString(const string& prompt) {
+        cout << prompt;
+        cin >> ws;
+        string s;
+        getline(cin, s);
+        return s;
+    }
+
+    Guest* findGuest(int id) {
+        for (auto& g : guests)
+            if (g.getId() == id)
+                return &g;
+        return nullptr;
+    }
+
+    Room* findRoom(int number) {
+        for (auto& r : rooms)
+            if (r->getRoomNumber() == number)
+                return r.get();
+        return nullptr;
+ 
+    }
+
+    Reservation* findReservation(int id) {
+        for (auto& r : reservations)
+            if (r->getId() == id)
+                return r.get();
+        return nullptr;
+    }
+
+public:
+    HotelManagementSystem() {
+        rooms.push_back(make_unique<StandardRoom>(101));
+        rooms.push_back(make_unique<StandardRoom>(102));
+        rooms.push_back(make_unique<DeluxeRoom>(201));
+        rooms.push_back(make_unique<DeluxeRoom>(202));
+        rooms.push_back(make_unique<SuiteRoom>(301));
+    }
+
+    void registerGuest() {
+        int id = readInt("Enter Guest ID: ", 1, 99999);
+
+        if (findGuest(id)) {
+            cout << "Guest already exists.\n";
+            return;
+        }
+
+        string n = readString("Enter Name: ");
+        string p = readString("Enter Phone: ");
+        string e = readString("Enter Email: ");
+
+        guests.emplace_back(id, n, p, e);
+        cout << "Guest registered successfully.\n";
+    }
+
+    void displayGuests() {
+        if (guests.empty()) {
+            cout << "No guests registered.\n";
+            return;
+        }
+
+        for (const auto& g : guests)
+            g.display();
+    }
+
+    void displayRooms() {
+        cout << "\nRoom No | Type | Rate | Status\n";
+        for (const auto& r : rooms)
+            r->display();
+    }
+
+    void makeReservation() {
+        if (guests.empty()) {
+            cout << "Register a guest first.\n";
+            return;
+        }
+
+        displayGuests();
+        int gid = readInt("Enter Guest ID: ", 1, 99999);
+        Guest* g = findGuest(gid);
+
+        if (!g) {
+            cout << "Guest not found.\n";
+            return;
+        }
+
+ 
+        displayRooms();
+        int roomNumber = readInt("Enter Room Number: ", 100, 999);
+        Room* r = findRoom(roomNumber);
+
+        if (!r || !r->isAvailable()) {
+            cout << "Room unavailable or invalid.\n";
+            return;
+        }
+
+        int d = readInt("Enter number of days: ", 1, 365);
+
+        reservations.push_back(
+            make_unique<Reservation>(*g, r, d)
+        );
+
+        cout << "Reservation created. ID: "
+             << reservations.back()->getId() << '\n';
+    }
+
+    void addService() {
+        int id = readInt("Enter Reservation ID: ", 1000, 99999);
+        Reservation* r = findReservation(id);
+
+        if (!r || !r->isActive()) {
+            cout << "Active reservation not found.\n";
+            return;
+        }
+
+        cout << "1. Food  2. Laundry  3. Spa\n";
+        int choice = readInt("Choose service: ", 1, 3);
+
+        if (choice == 1)
+            *r += make_unique<FoodService>();
+        else if (choice == 2)
+            *r += make_unique<LaundryService>();
+        else
+            *r += make_unique<SpaService>();
+
+        cout << "Service added.\n";
+    }
+
+    void viewReservation() {
+        int id = readInt("Enter Reservation ID: ", 1000, 99999);
+        Reservation* r = findReservation(id);
+
+        if (r)
+            r->display();
+        else
+            cout << "Reservation not found.\n";
+    }
+
+    void cancelReservation() {
+        int id = readInt("Enter Reservation ID: ", 1000, 99999);
+        Reservation* r = findReservation(id);
+
+        if (r && r->isActive()) {
+            r->cancel();
+            ++totalCancelled;
+            cout << "Reservation cancelled.\n";
+        } else {
+            cout << "Active reservation not found.\n";
+        }
+    }
+
+    void report() {
+ 
+        int occupied = 0;
+        int active = 0;
+        double revenue = 0;
+
+        for (const auto& r : rooms)
+            if (!r->isAvailable())
+                ++occupied;
+
+        for (const auto& r : reservations) {
+            if (r->isActive()) {
+                ++active;
+                revenue += r->calculateBill();
+            }
+        }
+
+        cout << "\n===== HOTEL UTILIZATION REPORT =====\n";
+        cout << "Total Rooms: " << rooms.size() << '\n';
+        cout << "Available Rooms: "
+             << rooms.size() - occupied << '\n';
+        cout << "Occupied Rooms: " << occupied << '\n';
+        cout << "Registered Guests: " << guests.size() << '\n';
+        cout << "Reservations Created: "
+             << Reservation::getTotalReservations() << '\n';
+        cout << "Active Reservations: " << active << '\n';
+        cout << "Cancelled Reservations: " << totalCancelled << '\n';
+        cout << "Active Reservation Value: Rs."
+             << fixed << setprecision(2) << revenue << '\n';
+    }
+
+    void run() {
+        int choice;
+
+        do {
+            cout << "\n========== HOTEL RESERVATION MANAGEMENT SYSTEM ==========\n";
+            cout << "1. Register Guest\n";
+            cout << "2. Display Guests\n";
+            cout << "3. Display Room Availability\n";
+            cout << "4. Make Reservation\n";
+            cout << "5. Add Hotel Service\n";
+            cout << "6. View Reservation / Bill\n";
+            cout << "7. Cancel Reservation\n";
+            cout << "8. Hotel Utilization Report\n";
+            cout << "9. Exit\n";
+
+            choice = readInt("Enter choice: ", 1, 9);
+
+            switch (choice) {
+                case 1: registerGuest(); break;
+                case 2: displayGuests(); break;
+                case 3: displayRooms(); break;
+                case 4: makeReservation(); break;
+                case 5: addService(); break;
+                case 6: viewReservation(); break;
+                case 7: cancelReservation(); break;
+                case 8: report(); break;
+                case 9: cout << "Thank you.\n"; break;
+            }
+        } while (choice != 9);
+    }
+};
+
+int main() {
+    HotelManagementSystem system;
+    system.run();
+    return 0;
+ 
+}
+ 
